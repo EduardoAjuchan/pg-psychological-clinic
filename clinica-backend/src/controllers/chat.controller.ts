@@ -32,6 +32,11 @@ export async function chatController(req: Request, res: Response) {
       }
     }
 
+    // --- historial corto en sesión (últimos 5 mensajes) ---
+    sess.history = Array.isArray(sess.history) ? sess.history : [];
+    sess.history.push({ role: "user", content: message, at: new Date().toISOString() });
+    if (sess.history.length > 5) sess.history = sess.history.slice(-5);
+
     // Slot-filling for "nombre" if pending
     if (
       sess?.pendingAction === "schedule_appointment" &&
@@ -41,14 +46,26 @@ export async function chatController(req: Request, res: Response) {
     ) {
       // Merge pendingArgs with the provided name
       const args = Object.assign({}, sess.pendingArgs || {}, { nombre: message.trim() });
-      const result = await mcpExecutor({ action: "schedule_appointment", data: args }, sess);
-      // Clear pending fields
-      delete sess.pendingAction;
-      delete sess.pendingArgs;
-      delete sess.pendingMissing;
-      delete sess.pendingSince;
-      req.session.save(() => {}); // Save session async
-      return res.json({ ok: true, message: result?.message ?? "Listo.", result });
+      try {
+        const result = await mcpExecutor({ action: "schedule_appointment", data: args }, sess);
+        // Clear pending fields
+        delete sess.pendingAction;
+        delete sess.pendingArgs;
+        delete sess.pendingMissing;
+        delete sess.pendingSince;
+        // guardar respuesta en historial
+        sess.history.push({ role: "assistant", content: result?.message ?? "Listo.", at: new Date().toISOString() });
+        if (sess.history.length > 5) sess.history = sess.history.slice(-5);
+        req.session.save(() => {}); // Save session async
+        return res.json({ ok: true, message: result?.message ?? "Listo.", result });
+      } catch (e: any) {
+        const msg = String(e?.message || "Error");
+        if (msg.startsWith("CONFLICTO_HORARIO:")) {
+          // No limpiamos pending, el usuario puede aceptar sugerencia o mandar otra hora
+          return res.status(409).json({ ok: false, code: "CONFLICT", message: msg.replace("CONFLICTO_HORARIO:", "").trim() });
+        }
+        throw e; // dejar que lo capture el catch global
+      }
     }
 
     const systemPrompt = await configService.getSystemPrompt();
@@ -58,8 +75,12 @@ export async function chatController(req: Request, res: Response) {
       Array.isArray(sess?.pendingMissing) && sess.pendingMissing.length ? `Faltan: ${sess.pendingMissing.join(", ")}.` : ``
     ].filter(Boolean).join(" ");
 
+    const historyLines = (sess.history as any[])
+      .map(h => `${h.role === 'user' ? 'U' : 'A'}: ${String(h.content).slice(0, 140)}`)
+      .join("\n");
+
     let messages: any[] = [
-      { role: "system", content: `${systemPrompt}\n${ctxHints}` },
+      { role: "system", content: `${systemPrompt}\n${ctxHints}\nHistorial reciente (máx 5):\n${historyLines}` },
       { role: "user", content: message }
     ];
 
@@ -79,6 +100,9 @@ export async function chatController(req: Request, res: Response) {
 
       if (!toolCalls || toolCalls.length === 0) {
         const finalText = msg.content ?? "Listo.";
+        sess.history.push({ role: "assistant", content: finalText, at: new Date().toISOString() });
+        if (sess.history.length > 5) sess.history = sess.history.slice(-5);
+        req.session.save(() => {});
         return res.json({ ok: true, message: finalText });
       }
 
@@ -88,13 +112,21 @@ export async function chatController(req: Request, res: Response) {
           const args = JSON.parse(call.function.arguments || "{}");
           if (!args.nombre && sess?.pacienteActivo?.nombre) args.nombre = sess.pacienteActivo.nombre;
 
-          const result = await mcpExecutor({ action: name, data: args }, sess);
-
-          messages.push({
-            role: "tool",
-            tool_call_id: call.id,
-            content: JSON.stringify(result)
-          });
+          try {
+            const result = await mcpExecutor({ action: name, data: args }, sess);
+            messages.push({
+              role: "tool",
+              tool_call_id: call.id,
+              content: JSON.stringify(result)
+            });
+          } catch (e: any) {
+            const msg = String(e?.message || "Error");
+            if (msg.startsWith("CONFLICTO_HORARIO:")) {
+              // Devolvemos inmediatamente una respuesta clara al usuario y no seguimos el loop de herramientas
+              return res.status(409).json({ ok: false, code: "CONFLICT", message: msg.replace("CONFLICTO_HORARIO:", "").trim() });
+            }
+            throw e;
+          }
         }
       }
     }
@@ -102,6 +134,10 @@ export async function chatController(req: Request, res: Response) {
     return res.json({ ok: false, message: "Se excedió el límite de pasos." });
   } catch (err: any) {
     // Return error as JSON, not HTML
-    return res.status(500).json({ ok: false, error: err?.message || "Error interno", details: err?.stack });
+    const emsg = String(err?.message || "Error interno");
+    if (emsg.startsWith("CONFLICTO_HORARIO:")) {
+      return res.status(409).json({ ok: false, code: "CONFLICT", message: emsg.replace("CONFLICTO_HORARIO:", "").trim() });
+    }
+    return res.status(500).json({ ok: false, error: emsg, details: err?.stack });
   }
 }

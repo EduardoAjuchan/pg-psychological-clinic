@@ -1,13 +1,13 @@
 {
   "name": "clinica-backend",
   "version": "1.0.0",
-"main": "index.js",
-"scripts": {
-  "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 ts-node-dev --respawn --transpile-only src/server.ts",
-  "build": "tsc",
-  "start": "node dist/server.js",
-  "typecheck": "tsc --noEmit"
-},
+  "main": "index.js",
+  "scripts": {
+    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -19,6 +19,7 @@
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "express-session": "^1.18.2",
+    "googleapis": "^160.0.0",
     "helmet": "^8.1.0",
     "morgan": "^1.10.1",
     "mysql2": "^3.14.3",

@@ -20,6 +20,18 @@ export async function getTools() {
   const cancelDesc = (await configService.get("tool.cancel_appointment.description"))
     || "Cancela (lógicamente) una cita de un paciente y elimina el evento en Google Calendar. Palabras clave: cancelar, anular. Si hay varias próximas activas, el backend pedirá fecha para desambiguar.";
 
+  const updatePatientDesc = (await configService.get("tool.update_patient.description"))
+    || "Edita datos de un paciente. Si no se pasa id, usar 'nombre' o pacienteActivo. Campos opcionales: nombre_completo, alias, telefono, genero, motivo_consulta, estado_proceso.";
+
+  const deactivatePatientDesc = (await configService.get("tool.deactivate_patient.description"))
+    || "Elimina lógicamente (estado='inactivo') un paciente. Usar id o nombre (o pacienteActivo).";
+
+  const listPatientsDesc = (await configService.get("tool.list_patients.description"))
+    || "Lista pacientes. Filtros: q (búsqueda normalizada), estado ('activo'|'inactivo'), paginación (limit, offset).";
+
+  const getPatientDetailsDesc = (await configService.get("tool.get_patient_details.description"))
+    || "Detalle del paciente más historial de notas activas. Usar id o nombre (o pacienteActivo). Parámetros de notas: notas_limit, notas_offset.";
+
   return [
     {
       type: "function",
@@ -85,6 +97,80 @@ export async function getTools() {
           properties: {
             nombre: { type: "string", description: "Nombre del paciente. Si falta, usar pacienteActivo." },
             fecha: { type: "string", description: "Opcional. Fecha de la cita a cancelar si el paciente tiene múltiples citas próximas; puede ser lenguaje natural o ISO." }
+          },
+          required: []
+        }
+      }
+    }
+    ,
+    {
+      type: "function",
+      function: {
+        name: "update_patient",
+        description: updatePatientDesc,
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "number", description: "ID del paciente si se conoce." },
+            nombre: { type: "string", description: "Nombre del paciente si no hay ID. Si falta, usar pacienteActivo." },
+            nombre_completo: { type: "string" },
+            alias: { type: "string" },
+            telefono: { type: "string" },
+            genero: { type: "string", enum: ["masculino","femenino","otro","no_especificado"] },
+            motivo_consulta: { type: "string" },
+            estado_proceso: { type: "string", enum: ["iniciado","en_pausa","finalizado"] }
+          },
+          required: []
+        }
+      }
+    }
+    ,
+    {
+      type: "function",
+      function: {
+        name: "deactivate_patient",
+        description: deactivatePatientDesc,
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "number" },
+            nombre: { type: "string", description: "Si falta id, usar nombre; si falta, usar pacienteActivo." }
+          },
+          required: []
+        }
+      }
+    }
+    ,
+    {
+      type: "function",
+      function: {
+        name: "list_patients",
+        description: listPatientsDesc,
+        parameters: {
+          type: "object",
+          properties: {
+            q: { type: "string" },
+            estado: { type: "string", enum: ["activo","inactivo"] },
+            limit: { type: "number" },
+            offset: { type: "number" }
+          },
+          required: []
+        }
+      }
+    }
+    ,
+    {
+      type: "function",
+      function: {
+        name: "get_patient_details",
+        description: getPatientDetailsDesc,
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "number" },
+            nombre: { type: "string" },
+            notas_limit: { type: "number" },
+            notas_offset: { type: "number" }
           },
           required: []
         }

@@ -9,6 +9,9 @@ export const MCPAction = z.enum([
   "get_patient_summary",
   "update_patient",
   "change_patient_state",
+  "deactivate_patient",     // baja lógica
+  "list_patients",          // listado con filtro
+  "get_patient_details",    // detalle + notas
 ]);
 export type TMCPAction = z.infer<typeof MCPAction>;
 

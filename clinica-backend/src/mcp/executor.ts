@@ -89,6 +89,94 @@ export async function mcpExecutor(payload: unknown, sess: any) {
       return { ok: true, message: r?.message || "Cita cancelada.", data: { cita_id: r?.cita_id } };
     }
 
+    case "update_patient": {
+      const id = (req.data as any)?.id as number | undefined;
+      let targetId = id;
+      if (!targetId) {
+        const nombre = (req.data as any)?.nombre ?? sess?.pacienteActivo?.nombre;
+        if (!nombre) {
+          return { ok: false, code: "MISSING_FIELD", missing: ["nombre|id"], message: "¿A qué paciente querés editar? (id o nombre)" };
+        }
+        const p = await pacientes.getByName(nombre);
+        targetId = p.id;
+      }
+
+      const updates = {
+        nombre_completo: (req.data as any)?.nombre_completo,
+        alias: (req.data as any)?.alias,
+        telefono: (req.data as any)?.telefono,
+        genero: (req.data as any)?.genero,
+        motivo_consulta: (req.data as any)?.motivo_consulta,
+        estado_proceso: (req.data as any)?.estado_proceso,
+      } as any;
+
+      const out = await pacientes.update(targetId!, updates);
+      // actualizar contexto activo
+      sess.pacienteActivo = { id: out.id, nombre: out.nombre_completo };
+      return { ok: true, message: `Paciente actualizado: ${out.nombre_completo}.`, paciente: out };
+    }
+
+    case "deactivate_patient": {
+      const id = (req.data as any)?.id as number | undefined;
+      let targetId = id;
+      if (!targetId) {
+        const nombre = (req.data as any)?.nombre ?? sess?.pacienteActivo?.nombre;
+        if (!nombre) {
+          return { ok: false, code: "MISSING_FIELD", missing: ["nombre|id"], message: "¿A quién querés desactivar? (id o nombre)" };
+        }
+        const p = await pacientes.getByName(nombre);
+        targetId = p.id;
+      }
+
+      const out = await pacientes.removeLogical(targetId!);
+      // limpiar contexto si corresponde
+      if (sess?.pacienteActivo?.id === targetId) {
+        delete sess.pacienteActivo;
+      }
+      return { ok: true, message: `Paciente desactivado (id=${out.id}).`, result: out };
+    }
+
+    case "list_patients": {
+      // Forzar estado por defecto = 'activo' salvo que explícitamente pidan 'inactivo'
+      let estado = (req.data as any)?.estado;
+      if (estado !== "inactivo") estado = "activo";
+
+      const params = {
+        q: (req.data as any)?.q,
+        estado,
+        limit: (req.data as any)?.limit,
+        offset: (req.data as any)?.offset,
+      } as any;
+
+      const out = await pacientes.list(params);
+      return {
+        ok: true,
+        message: out.total
+          ? `Se encontraron ${out.total} pacientes ${estado}s.`
+          : `No hay pacientes ${estado}s para los filtros indicados.`,
+        ...out,
+      };
+    }
+
+    case "get_patient_details": {
+      const id = (req.data as any)?.id as number | undefined;
+      let targetId = id;
+      if (!targetId) {
+        const nombre = (req.data as any)?.nombre ?? sess?.pacienteActivo?.nombre;
+        if (!nombre) {
+          return { ok: false, code: "MISSING_FIELD", missing: ["nombre|id"], message: "Necesito el id o el nombre del paciente." };
+        }
+        const p = await pacientes.getByName(nombre);
+        targetId = p.id;
+      }
+      const notasLimit = (req.data as any)?.notas_limit ?? 20;
+      const notasOffset = (req.data as any)?.notas_offset ?? 0;
+      const out = await pacientes.getDetails(targetId!, { notasLimit, notasOffset });
+      // set contexto activo por conveniencia
+      sess.pacienteActivo = { id: out.paciente.id, nombre: out.paciente.nombre_completo };
+      return { ok: true, message: `Detalle de ${out.paciente.nombre_completo}.`, ...out };
+    }
+
     default:
       return { ok: false, message: "Acción no reconocida" };
   }

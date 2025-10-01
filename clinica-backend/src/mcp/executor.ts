@@ -1,6 +1,8 @@
 import { MCPRequest } from "../lib/schemas";
 import * as pacientes from "../services/pacientes.service";
 import * as citas from "../services/citas.service";
+import * as notas from "../services/notas.service";
+import * as ia from "../services/ia.service";
 
 export async function mcpExecutor(payload: unknown, sess: any) {
   const req = MCPRequest.parse(payload);
@@ -175,6 +177,124 @@ export async function mcpExecutor(payload: unknown, sess: any) {
       // set contexto activo por conveniencia
       sess.pacienteActivo = { id: out.paciente.id, nombre: out.paciente.nombre_completo };
       return { ok: true, message: `Detalle de ${out.paciente.nombre_completo}.`, ...out };
+    }
+
+    case "create_session_entry": {
+      // Resolver paciente por nombre (o contexto) o por id; si falta, pedir nombre
+      const nombre = (req.data as any)?.nombre ?? sess?.pacienteActivo?.nombre;
+      const pacienteId = (req.data as any)?.paciente_id as number | undefined;
+
+      if (!nombre && !pacienteId) {
+        sess.pendingAction = "create_session_entry";
+        sess.pendingArgs = { ...(req.data || {}) };
+        // Para compatibilidad con el slot-filling actual, pedimos específicamente el nombre
+        sess.pendingMissing = ["nombre"];
+        sess.pendingSince = Date.now();
+        return { ok: false, code: "MISSING_FIELD", missing: ["nombre"], message: "¿De qué paciente es la nota? Decime el nombre." };
+      }
+
+      const created = await notas.createByRef(req.data, pacienteId, undefined);
+
+      // Actualizar contexto si tenemos nombre
+      if (nombre) {
+        sess.pacienteActivo = { ...(sess.pacienteActivo || {}), nombre };
+      }
+
+      return { ok: true, message: `Nota de sesión creada (id=${created.id}).`, nota: created };
+    }
+
+    case "list_session_entries": {
+      // Identificar paciente por id o nombre (o contexto)
+      const nombre = (req.data as any)?.nombre ?? sess?.pacienteActivo?.nombre;
+      const pacienteId = (req.data as any)?.paciente_id as number | undefined;
+      if (!nombre && !pacienteId) {
+        sess.pendingAction = "list_session_entries";
+        sess.pendingArgs = { ...(req.data || {}) };
+        sess.pendingMissing = ["nombre"];
+        sess.pendingSince = Date.now();
+        return { ok: false, code: "MISSING_FIELD", missing: ["nombre"], message: "¿De qué paciente querés ver las notas? Decime el nombre." };
+      }
+
+      // Si vino id lo usamos directo; si vino nombre, el servicio lo resuelve internamente
+      const estado = (req.data as any)?.estado ?? "activo"; // 'activo' | 'inactivo' | 'todos'
+      const limit = (req.data as any)?.limit ?? 20;
+      const offset = (req.data as any)?.offset ?? 0;
+
+      // Para obtener el id cuando tenemos nombre, reutilizamos pacientes.getByName (consistente con el resto del sistema)
+      let targetId = pacienteId;
+      if (!targetId && nombre) {
+        const p = await pacientes.getByName(nombre);
+        targetId = p.id;
+      }
+
+      const out = await notas.listByPaciente(targetId!, { estado, limit, offset } as any);
+
+      // Setear contexto por conveniencia
+      if (nombre) {
+        sess.pacienteActivo = { ...(sess.pacienteActivo || {}), nombre };
+      }
+
+      const qty = out.total ?? (out.items?.length || 0);
+      const estadoTxt = estado === 'todos' ? 'activos e inactivos' : `${estado}s`;
+      const msg = qty
+        ? `Se encontraron ${qty} notas ${estadoTxt} para el paciente.`
+        : `No hay notas ${estadoTxt} para el paciente.`;
+
+      return { ok: true, message: msg, ...out };
+    }
+
+    case "suggest_diagnosis": {
+      const nombre = (req.data as any)?.nombre ?? sess?.pacienteActivo?.nombre;
+      const pacienteId = (req.data as any)?.paciente_id as number | undefined;
+
+      if (!nombre && !pacienteId) {
+        sess.pendingAction = "suggest_diagnosis";
+        sess.pendingArgs = { ...(req.data || {}) };
+        sess.pendingMissing = ["nombre"];
+        sess.pendingSince = Date.now();
+        return { ok: false, code: "MISSING_FIELD", missing: ["nombre"], message: "¿De qué paciente querés el posible diagnóstico? Decime el nombre." };
+      }
+
+      let targetId = pacienteId;
+      if (!targetId && nombre) {
+        const p = await pacientes.getByName(nombre);
+        targetId = p.id;
+      }
+
+      const content = await ia.suggestDiagnosisByPatientId(targetId!);
+
+      if (nombre) {
+        sess.pacienteActivo = { ...(sess.pacienteActivo || {}), nombre };
+      }
+
+      return { ok: true, message: content };
+    }
+
+    case "suggest_techniques": {
+      const nombre = (req.data as any)?.nombre ?? sess?.pacienteActivo?.nombre;
+      const pacienteId = (req.data as any)?.paciente_id as number | undefined;
+
+      if (!nombre && !pacienteId) {
+        sess.pendingAction = "suggest_techniques";
+        sess.pendingArgs = { ...(req.data || {}) };
+        sess.pendingMissing = ["nombre"];
+        sess.pendingSince = Date.now();
+        return { ok: false, code: "MISSING_FIELD", missing: ["nombre"], message: "¿Para qué paciente querés recomendaciones de técnicas? Decime el nombre." };
+      }
+
+      let targetId = pacienteId;
+      if (!targetId && nombre) {
+        const p = await pacientes.getByName(nombre);
+        targetId = p.id;
+      }
+
+      const content = await ia.suggestTechniquesByPatientId(targetId!);
+
+      if (nombre) {
+        sess.pacienteActivo = { ...(sess.pacienteActivo || {}), nombre };
+      }
+
+      return { ok: true, message: content };
     }
 
     default:

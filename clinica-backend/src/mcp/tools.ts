@@ -32,6 +32,18 @@ export async function getTools() {
   const getPatientDetailsDesc = (await configService.get("tool.get_patient_details.description"))
     || "Detalle del paciente más historial de notas activas. Usar id o nombre (o pacienteActivo). Parámetros de notas: notas_limit, notas_offset.";
 
+  const createSessionEntryDesc = (await configService.get("tool.create_session_entry.description"))
+    || "Crea una nota de sesión para un paciente existente. Extrae campos desde lenguaje natural con estas reglas: \n- sintomas: experiencias subjetivas (insomnio, palpitaciones, tensión, etc.); evita diagnósticos aquí.\n- padecimientos: antecedentes/condiciones médicas (diabetes, hipertensión, migraña, etc.).\n- notas_importantes: recordatorios/plan de intervención/seguimiento (p. ej., higiene del sueño, adherencia al tratamiento).\n- trastornos: nombres de trastornos o hipótesis clínicas (TAG, depresión leve, trastorno adaptativo, etc.).\n- afectamientos_subyacentes: factores contextuales externos que influyen (familia, trabajo, economía, pareja).\n- diagnostico: diagnóstico clínico preliminar o sugerido; no dupliques con sintomas.\nNo inventes datos. No dejes campos vacíos si hay evidencia en el texto; si no hay información, omite el campo (no envíes string vacío). Devuelve cada campo como texto conciso (frases separadas por comas si aplica), sin etiquetas ni formato. Usa 'nombre' o 'paciente_id' (o pacienteActivo). 'fecha' es opcional; si no viene, usar la actual.";
+
+  const listSessionEntriesDesc = (await configService.get("tool.list_session_entries.description"))
+    || "Lista notas de sesión de un paciente. Identificar por id o nombre (o pacienteActivo). Filtros: estado ('activo'|'inactivo'|'todos'), paginación (limit, offset).";
+
+  const suggestDxDesc = (await configService.get("tool.suggest_diagnosis.description"))
+    || "Genera hipótesis diagnósticas diferenciales y un diagnóstico principal sugerido basándose en motivo de consulta e historial de notas. Usa nombre o paciente_id (o pacienteActivo).";
+
+  const suggestTechDesc = (await configService.get("tool.suggest_techniques.description"))
+    || "Genera técnicas/intervenciones recomendadas, objetivos y mini plan de sesiones basándose en motivo de consulta e historial de notas. Usa nombre o paciente_id (o pacienteActivo).";
+
   return [
     {
       type: "function",
@@ -171,6 +183,80 @@ export async function getTools() {
             nombre: { type: "string" },
             notas_limit: { type: "number" },
             notas_offset: { type: "number" }
+          },
+          required: []
+        }
+      }
+    }
+    ,
+    {
+      type: "function",
+      function: {
+        name: "create_session_entry",
+        description: createSessionEntryDesc,
+        parameters: {
+          type: "object",
+          properties: {
+            nombre: { type: "string", description: "Nombre del paciente. Si falta, usar pacienteActivo o paciente_id." },
+            paciente_id: { type: "number", description: "ID del paciente (opcional si se usa nombre o contexto)." },
+            fecha: { type: "string", description: "Opcional. Fecha/hora de la nota (ISO o YYYY-MM-DD HH:mm)." },
+            sintomas: { type: "string" },
+            padecimientos: { type: "string" },
+            notas_importantes: { type: "string" },
+            trastornos: { type: "string" },
+            afectamientos_subyacentes: { type: "string" },
+            diagnostico: { type: "string" }
+          },
+          required: []
+        }
+      }
+    }
+    ,
+    {
+      type: "function",
+      function: {
+        name: "list_session_entries",
+        description: listSessionEntriesDesc,
+        parameters: {
+          type: "object",
+          properties: {
+            nombre: { type: "string", description: "Nombre del paciente; si falta usar pacienteActivo o paciente_id." },
+            paciente_id: { type: "number", description: "ID del paciente; opcional si viene 'nombre' o contexto." },
+            estado: { type: "string", enum: ["activo","inactivo","todos"], description: "Por defecto 'activo'." },
+            limit: { type: "number" },
+            offset: { type: "number" }
+          },
+          required: []
+        }
+      }
+    }
+    ,
+    {
+      type: "function",
+      function: {
+        name: "suggest_diagnosis",
+        description: suggestDxDesc,
+        parameters: {
+          type: "object",
+          properties: {
+            nombre: { type: "string", description: "Nombre del paciente; si falta, usar pacienteActivo o paciente_id." },
+            paciente_id: { type: "number", description: "ID del paciente (opcional si hay nombre o contexto)." }
+          },
+          required: []
+        }
+      }
+    }
+    ,
+    {
+      type: "function",
+      function: {
+        name: "suggest_techniques",
+        description: suggestTechDesc,
+        parameters: {
+          type: "object",
+          properties: {
+            nombre: { type: "string", description: "Nombre del paciente; si falta, usar pacienteActivo o paciente_id." },
+            paciente_id: { type: "number", description: "ID del paciente (opcional si hay nombre o contexto)." }
           },
           required: []
         }

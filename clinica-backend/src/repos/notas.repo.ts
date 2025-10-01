@@ -29,15 +29,41 @@ export async function getById(id: number) {
   return rows[0];
 }
 
-export async function listByPaciente(pacienteId: number, { limit = 20, offset = 0 } = {}) {
+export async function listByPaciente(
+  pacienteId: number,
+  { estado = 'activo', limit = 20, offset = 0 }: { estado?: 'activo' | 'inactivo' | 'todos'; limit?: number; offset?: number } = {}
+) {
+  const params: any[] = [pacienteId];
+  let whereEstado = `estado='activo'`;
+  if (estado === 'inactivo') whereEstado = `estado='inactivo'`;
+  if (estado === 'todos') whereEstado = `estado IN ('activo','inactivo')`;
+
   const [rows]: any = await pool.query(
-    `SELECT * FROM notas_sesion
-     WHERE paciente_id=? AND estado='activo'
+    `SELECT id, fecha, creada_por, sintomas, padecimientos, notas_importantes, trastornos,
+            afectamientos_subyacentes, diagnostico, estado
+     FROM notas_sesion
+     WHERE paciente_id=? AND ${whereEstado}
      ORDER BY fecha DESC
      LIMIT ? OFFSET ?`,
-    [pacienteId, limit, offset]
+    [...params, Number(limit), Number(offset)]
   );
-  return rows;
+  return rows as any[];
+}
+
+export async function countByPaciente(
+  pacienteId: number,
+  { estado = 'activo' as 'activo' | 'inactivo' | 'todos' } = {}
+) {
+  const params: any[] = [pacienteId];
+  let whereEstado = `estado='activo'`;
+  if (estado === 'inactivo') whereEstado = `estado='inactivo'`;
+  if (estado === 'todos') whereEstado = `estado IN ('activo','inactivo')`;
+
+  const [rows]: any = await pool.query(
+    `SELECT COUNT(*) AS total FROM notas_sesion WHERE paciente_id=? AND ${whereEstado}`,
+    params
+  );
+  return (rows?.[0]?.total as number) ?? 0;
 }
 
 export async function updateById(id: number, data: any) {

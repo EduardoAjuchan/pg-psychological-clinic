@@ -6,12 +6,15 @@ export const MCPAction = z.enum([
   "reschedule_appointment",
   "cancel_appointment",
   "create_session_entry",
+  "list_session_entries",
   "get_patient_summary",
   "update_patient",
   "change_patient_state",
   "deactivate_patient",     // baja lógica
   "list_patients",          // listado con filtro
   "get_patient_details",    // detalle + notas
+   "suggest_diagnosis",
+  "suggest_techniques",
 ]);
 export type TMCPAction = z.infer<typeof MCPAction>;
 

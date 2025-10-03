@@ -53,3 +53,63 @@ export async function cancelById(id: number) {
   await pool.query(`UPDATE citas SET estado='inactivo' WHERE id=?`, [id]);
   return getById(id);
 }
+
+/** Listado flexible para menú */
+export async function list(opts: {
+  paciente_id?: number;
+  estado?: "activo" | "inactivo";
+  desde?: string;  // 'YYYY-MM-DD HH:mm:ss'
+  hasta?: string;  // 'YYYY-MM-DD HH:mm:ss'
+  limit?: number;
+  offset?: number;
+}) {
+  const {
+    paciente_id,
+    estado,
+    desde,
+    hasta,
+    limit = 50,
+    offset = 0,
+  } = opts || {};
+
+  const where: string[] = ["1=1"];
+  const params: any[] = [];
+
+  if (paciente_id) { where.push("c.paciente_id = ?"); params.push(paciente_id); }
+  if (estado)      { where.push("c.estado = ?");      params.push(estado); }
+  if (desde)       { where.push("c.fecha >= ?");      params.push(desde); }
+  if (hasta)       { where.push("c.fecha < ?");       params.push(hasta); }
+
+  const sql =
+    `SELECT c.*, p.nombre_completo
+     FROM citas c
+     JOIN pacientes p ON p.id = c.paciente_id
+     WHERE ${where.join(" AND ")}
+     ORDER BY c.fecha DESC
+     LIMIT ? OFFSET ?`;
+
+  const [rows]: any = await pool.query(sql, [...params, Number(limit), Number(offset)]);
+  return rows as any[];
+}
+
+export async function count(opts: {
+  paciente_id?: number;
+  estado?: "activo" | "inactivo";
+  desde?: string;
+  hasta?: string;
+}) {
+  const { paciente_id, estado, desde, hasta } = opts || {};
+  const where: string[] = ["1=1"];
+  const params: any[] = [];
+
+  if (paciente_id) { where.push("paciente_id = ?"); params.push(paciente_id); }
+  if (estado)      { where.push("estado = ?");      params.push(estado); }
+  if (desde)       { where.push("fecha >= ?");      params.push(desde); }
+  if (hasta)       { where.push("fecha < ?");       params.push(hasta); }
+
+  const [rows]: any = await pool.query(
+    `SELECT COUNT(*) AS total FROM citas WHERE ${where.join(" AND ")}`,
+    params
+  );
+  return rows[0]?.total ?? 0;
+}

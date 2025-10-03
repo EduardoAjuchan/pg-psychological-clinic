@@ -14,7 +14,46 @@ import dashboardRoutes from "./routes/dashboard.routes";
 
 const app = express();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN?.split(",") || true, credentials: true }));
+// CORS: permitir múltiples orígenes desde .env (coma-separados)
+const ALLOWED_ORIGINS_RAW = (process.env.CORS_ORIGIN || "");
+const ALLOWED_ORIGINS = ALLOWED_ORIGINS_RAW
+  .split(",")
+  .map(s => s.trim().replace(/\/$/, "")) // sin barra final
+  .filter(Boolean);
+
+function normalizeOrigin(o?: string) {
+  return (o || "").replace(/\/$/, "");
+}
+
+function isAllowedOrigin(origin?: string) {
+  const o = normalizeOrigin(origin);
+  if (!o) return true; // curl/postman sin origin
+  if (ALLOWED_ORIGINS.length === 0) return true; // sin config -> permitir en dev
+  if (ALLOWED_ORIGINS.includes("*")) return true; // comodín global (dev)
+  if (ALLOWED_ORIGINS.includes(o)) return true; // match exacto
+
+  // localhost / 127.0.0.1 con cualquier puerto
+  const allowLocalhostAny = ALLOWED_ORIGINS.includes("http://localhost:*") || ALLOWED_ORIGINS.includes("https://localhost:*");
+  const allowLoopbackAny = ALLOWED_ORIGINS.includes("http://127.0.0.1:*") || ALLOWED_ORIGINS.includes("https://127.0.0.1:*");
+  if (allowLocalhostAny && /^https?:\/\/(localhost)(?::\d+)?$/.test(o)) return true;
+  if (allowLoopbackAny && /^https?:\/\/(127\.0\.0\.1)(?::\d+)?$/.test(o)) return true;
+
+  return false;
+}
+
+app.use(cors({
+  origin(origin, callback) {
+    if (isAllowedOrigin(origin)) {
+      return callback(null, true);
+    }
+    // negar CORS (el navegador bloqueará)
+    return callback(null, false);
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+}));
+
 app.use(express.json());
 app.use(session({
   secret: process.env.SESSION_SECRET!,

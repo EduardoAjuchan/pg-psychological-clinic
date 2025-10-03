@@ -13,6 +13,7 @@ import {
   IconButton,
   Box,
   Typography,
+  Tooltip,
 } from '@mui/material';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import DiamondOutlinedIcon from '@mui/icons-material/DiamondOutlined';
@@ -21,6 +22,7 @@ import EventNoteOutlinedIcon from '@mui/icons-material/EventNoteOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
+import { hasPermission } from '@/lib/permissions';
 
 const drawerWidth = 200;
 
@@ -43,6 +45,9 @@ const items: Item[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // permisos
+  const canConfig = hasPermission('config:write');
 
   const activeMap = useMemo(
     () =>
@@ -74,39 +79,66 @@ export default function Sidebar() {
       <List sx={{ py: 0 }}>
         {items.map(it => {
           const selected = activeMap[it.href];
-          return (
+          const isSettings = it.href === '/ajustes';
+          const disabled = isSettings && !canConfig;
+
+          const button = (
             <ListItemButton
-              key={it.href}
-              component={Link}
-              href={it.href}
-              selected={selected}
+              component={disabled ? 'button' : Link}
+              href={disabled ? undefined : it.href}
+              selected={selected && !disabled}
+              disabled={disabled}
               sx={{
-                borderRadius: 2,
-                my: 1.5,
-                mx: 1.5,
+                width: '100%',
                 py: 2.5,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: 1,
-                color: selected ? '#5b21b6' : 'text.primary',
+                color: selected && !disabled ? '#5b21b6' : 'text.primary',
                 '& .sidebar-icon': {
-                  color: selected ? '#5b21b6' : 'text.secondary',
+                  color: selected && !disabled ? '#5b21b6' : 'text.secondary',
                 },
                 '&.Mui-selected': {
                   bgcolor: '#67e8f9', // cian suave como en el mock
                 },
                 '&:hover': {
-                  bgcolor: selected ? '#67e8f9' : 'action.hover',
+                  bgcolor: selected && !disabled ? '#67e8f9' : 'action.hover',
+                },
+                '&.Mui-disabled': {
+                  opacity: 0.5,
+                  pointerEvents: 'none',
                 },
               }}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => {
+                if (!disabled) setMobileOpen(false);
+              }}
             >
               <Box className="sidebar-icon" sx={{ fontSize: { xs: '1.25rem', md: '1.75rem' } }}>
                 {it.icon}
               </Box>
-              <Typography variant="body1" sx={{ fontWeight: 500, fontSize: { xs: '0.72rem', md: '1rem' } }}>{it.label}</Typography>
+              <Typography variant="body1" sx={{ fontWeight: 500, fontSize: { xs: '0.72rem', md: '1rem' } }}>
+                {it.label}
+              </Typography>
             </ListItemButton>
+          );
+
+          // Tooltip sólo cuando está deshabilitado
+          if (disabled) {
+            return (
+              <Box key={it.href} sx={{ my: 1.5, mx: 1.5 }}>
+                <Tooltip title="Sin permisos para configurar" placement="right">
+                  {/* span para permitir tooltip sobre elemento deshabilitado */}
+                  <span style={{ display: 'block', width: '100%' }}>{button}</span>
+                </Tooltip>
+              </Box>
+            );
+          }
+
+          return (
+            <Box key={it.href} sx={{ my: 1.5, mx: 1.5 }}>
+              {button}
+            </Box>
           );
         })}
       </List>

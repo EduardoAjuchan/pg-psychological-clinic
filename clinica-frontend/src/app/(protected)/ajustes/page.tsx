@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Suspense, type Dispatch, type SetStateAction } from 'react';
 import Image from 'next/image';
 import {
   Box,
@@ -21,11 +22,36 @@ import { RegisterForm } from '@/app/(auth)/register/page';
 import { useSearchParams } from 'next/navigation';
 import PermissionGate from '@/components/(auth)/PermissionGate';
 
-export default function SettingsPage() {
-  
+export const dynamic = 'force-dynamic';
+type ToastState = { open: boolean; msg: string; type?: 'success' | 'error' };
+
+function ParamsWatcher({
+  setGConnected,
+  setToast,
+}: {
+  setGConnected: Dispatch<SetStateAction<boolean>>;
+  setToast: Dispatch<SetStateAction<ToastState>>;
+}) {
   const searchParams = useSearchParams();
 
-  const [toast, setToast] = useState<{ open: boolean; msg: string; type?: 'success' | 'error' }>({
+  useEffect(() => {
+    const google = searchParams.get('google');
+    const status = searchParams.get('status');
+    if ((google === 'connected' || status === 'success') && typeof window !== 'undefined') {
+      localStorage.setItem('calendar:connected', '1');
+      setGConnected(true);
+      setToast({ open: true, msg: 'Google Calendar conectado', type: 'success' });
+      // Optional: clean URL params if desired
+      // history.replaceState(null, '', window.location.pathname);
+    }
+  }, [searchParams, setGConnected, setToast]);
+
+  return null;
+}
+
+export default function SettingsPage() {
+  
+  const [toast, setToast] = useState<ToastState>({
     open: false,
     msg: '',
   });
@@ -36,19 +62,6 @@ export default function SettingsPage() {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('calendar:connected') === '1';
   });
-
-  useEffect(() => {
-    // Si el backend redirige con un flag en la URL tras conceder permisos
-    const google = searchParams.get('google');
-    const status = searchParams.get('status');
-    if ((google === 'connected' || status === 'success') && typeof window !== 'undefined') {
-      localStorage.setItem('calendar:connected', '1');
-      setGConnected(true);
-      setToast({ open: true, msg: 'Google Calendar conectado', type: 'success' });
-      // Opcional: limpiar los params de la URL
-      // history.replaceState(null, '', window.location.pathname);
-    }
-  }, [searchParams]);
 
   const popupRef = useRef<Window | null>(null);
 
@@ -94,6 +107,9 @@ export default function SettingsPage() {
 
   return (
     <PermissionGate required="config:write" fallbackHref="/dashboard">
+      <Suspense fallback={null}>
+        <ParamsWatcher setGConnected={setGConnected} setToast={setToast} />
+      </Suspense>
       <Box className="space-y-4">
         {/* Encabezado */}
         <Box className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

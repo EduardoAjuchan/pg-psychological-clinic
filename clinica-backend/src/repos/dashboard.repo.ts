@@ -104,6 +104,7 @@ export async function getAppointmentsByDay({
      FROM citas
      WHERE estado='activo'
      ${clause}
+     AND google_event_id IS NOT NULL
      GROUP BY dia
      ORDER BY dia ASC`,
     params
@@ -123,6 +124,7 @@ export async function getAppointmentsByStatus({
      WHERE 1=1
      ${clause}
      ${extraFuture}
+     AND google_event_id IS NOT NULL
      GROUP BY estado
      ORDER BY estado`,
     params

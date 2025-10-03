@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -45,9 +45,11 @@ const items: Item[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
-  // permisos
-  const canConfig = hasPermission('config:write');
+  // permisos (hidratación segura: en el primer render del cliente usamos el mismo valor que SSR)
+  const canConfig = mounted ? hasPermission('config:write') : false;
 
   const activeMap = useMemo(
     () =>
@@ -84,8 +86,8 @@ export default function Sidebar() {
 
           const button = (
             <ListItemButton
-              component={disabled ? 'button' : Link}
-              href={disabled ? undefined : it.href}
+              component={Link}
+              href={it.href}
               selected={selected && !disabled}
               disabled={disabled}
               sx={{
@@ -96,6 +98,7 @@ export default function Sidebar() {
                 alignItems: 'center',
                 gap: 1,
                 color: selected && !disabled ? '#5b21b6' : 'text.primary',
+                pointerEvents: disabled ? 'none' : 'auto',
                 '& .sidebar-icon': {
                   color: selected && !disabled ? '#5b21b6' : 'text.secondary',
                 },
@@ -110,8 +113,13 @@ export default function Sidebar() {
                   pointerEvents: 'none',
                 },
               }}
-              onClick={() => {
-                if (!disabled) setMobileOpen(false);
+              onClick={(e) => {
+                if (disabled) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  return;
+                }
+                setMobileOpen(false);
               }}
             >
               <Box className="sidebar-icon" sx={{ fontSize: { xs: '1.25rem', md: '1.75rem' } }}>

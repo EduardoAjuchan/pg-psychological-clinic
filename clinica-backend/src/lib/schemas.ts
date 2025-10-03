@@ -1,14 +1,25 @@
 import { z } from "zod";
 
+export const MCPAction = z.enum([
+  "create_patient",
+  "schedule_appointment",
+  "reschedule_appointment",
+  "cancel_appointment",
+  "create_session_entry",
+  "list_session_entries",
+  "get_patient_summary",
+  "update_patient",
+  "change_patient_state",
+  "deactivate_patient",     // baja lógica
+  "list_patients",          // listado con filtro
+  "get_patient_details",    // detalle + notas
+   "suggest_diagnosis",
+  "suggest_techniques",
+]);
+export type TMCPAction = z.infer<typeof MCPAction>;
+
 export const MCPRequest = z.object({
-  action: z.enum([
-    "create_patient",
-    "schedule_appointment",
-    "create_session_entry",
-    "get_patient_summary",
-    "update_patient",
-    "change_patient_state",
-  ]),
+  action: MCPAction,
   data: z.record(z.any()),
 });
 export type TMCPRequest = z.infer<typeof MCPRequest>;

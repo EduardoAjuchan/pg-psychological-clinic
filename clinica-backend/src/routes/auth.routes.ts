@@ -1,6 +1,8 @@
 import { login, verifyLogin2FA } from "../services/auth.service";
 import { Router } from "express";
 import * as twofa from "../services/twofa.service";
+import { loginLimiter } from "../middlewares/rateLimit";
+import { requireJwt, requirePermissionJwt } from "../middlewares/jwt";
 
 const r = Router();
 
@@ -9,7 +11,7 @@ const r = Router();
  * - Genera secreto TOTP, muestra QR en terminal y devuelve dataURL opcional.
  * - En prod deberías protegerlo (JWT + users:create). Por ahora, sin middleware para probar.
  */
-r.get("/2fa/setup/:userId", async (req, res) => {
+r.get("/2fa/setup/:userId", requireJwt, requirePermissionJwt("users:create"), async (req, res) => {
   try {
     const userId = Number(req.params.userId);
     const setup = await twofa.generateSetup(userId);
@@ -26,7 +28,7 @@ r.get("/2fa/setup/:userId", async (req, res) => {
  * Body: { userId: number, tempSecretBase32: string, token: string }
  * - Verifica un OTP contra el secret temporal y si es válido, lo guarda en BD.
  */
-r.post("/2fa/verify-setup", async (req, res) => {
+r.post("/2fa/verify-setup", requireJwt, requirePermissionJwt("users:create"), async (req, res) => {
   try {
     const { userId, tempSecretBase32, token } = req.body as {
       userId: number; tempSecretBase32: string; token: string;
@@ -45,7 +47,7 @@ r.post("/2fa/verify-setup", async (req, res) => {
 });
 
 // Paso 1: login con usuario y password
-r.post("/login", async (req, res) => {
+r.post("/login", loginLimiter, async (req, res) => {
   try {
     const out = await login(req, req.body);
     res.json({ ok: true, ...out });
@@ -57,7 +59,7 @@ r.post("/login", async (req, res) => {
 });
 
 // Paso 2: verificación del OTP 2FA
-r.post("/login/2fa/verify", async (req, res) => {
+r.post("/login/2fa/verify", loginLimiter, async (req, res) => {
   try {
     const { token } = req.body as { token: string };
     const out = await verifyLogin2FA(req, token);

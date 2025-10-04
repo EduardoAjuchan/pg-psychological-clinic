@@ -13,6 +13,7 @@ import dashboardRoutes from "./routes/dashboard.routes";
 
 
 const app = express();
+app.set("trust proxy", 1);
 
 // CORS: permitir múltiples orígenes desde .env (coma-separados)
 const ALLOWED_ORIGINS_RAW = (process.env.CORS_ORIGIN || "");
@@ -59,6 +60,10 @@ app.use(session({
   secret: process.env.SESSION_SECRET!,
   resave: false,
   saveUninitialized: false,
+  cookie: {
+    sameSite: process.env.SESSION_SAMESITE === "None" ? "none" : "lax",
+    secure: process.env.SESSION_SECURE === "true",
+  },
 }));
 
 

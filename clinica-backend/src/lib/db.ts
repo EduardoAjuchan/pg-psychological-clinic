@@ -18,7 +18,6 @@ export const pool = mysql.createPool(
   process.env.INSTANCE_CONNECTION_NAME
     ? {
         ...base,
-        host: "localhost",
         socketPath: `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
       }
     : {
@@ -27,3 +26,13 @@ export const pool = mysql.createPool(
         port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
       }
 );
+
+if (process.env.INSTANCE_CONNECTION_NAME) {
+  console.log(
+    `[db] Using UNIX socket at /cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`
+  );
+} else {
+  console.log(
+    `[db] Using TCP at ${process.env.DB_HOST}:${process.env.DB_PORT ? process.env.DB_PORT : 3306}`
+  );
+}

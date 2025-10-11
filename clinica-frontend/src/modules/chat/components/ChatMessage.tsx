@@ -1,6 +1,9 @@
 'use client';
 
 import { Avatar, Box, Paper, Typography } from '@mui/material';
+import { useEffect, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function ChatMessage({
   from,
@@ -9,6 +12,9 @@ export default function ChatMessage({
   from: 'assistant' | 'user';
   text: string;
 }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
   const isUser = from === 'user';
 
   return (
@@ -27,9 +33,35 @@ export default function ChatMessage({
           color: isUser ? 'white' : 'inherit',
           borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
           maxWidth: '80%',
+          // Add minimal prose styles for Markdown rendering
+          '& h1, & h2, & h3, & h4, & h5, & h6': {
+            marginTop: 1,
+            marginBottom: 1,
+            fontWeight: 'bold',
+          },
+          '& ul, & ol': {
+            paddingLeft: 3,
+            marginTop: 1,
+            marginBottom: 1,
+          },
+          '& strong': {
+            fontWeight: 'bold',
+          },
+          '& p': {
+            marginTop: 1,
+            marginBottom: 1,
+          },
         }}
       >
-        <Typography variant="body1">{text}</Typography>
+        {isUser ? (
+          <Typography variant="body1">{text}</Typography>
+        ) : (
+          <Box>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {text}
+            </ReactMarkdown>
+          </Box>
+        )}
       </Paper>
 
       {isUser && (

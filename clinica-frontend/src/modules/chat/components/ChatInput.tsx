@@ -4,8 +4,16 @@ import { useState } from 'react';
 import { Box, Button, OutlinedInput } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 
-export default function ChatInput({ onSend }: { onSend: (text: string) => void }) {
-  const [text, setText] = useState('');
+interface ChatInputProps {
+  onSend: (text: string) => void;
+  value?: string;
+  onChange?: (value: string) => void;
+}
+
+export default function ChatInput({ onSend, value, onChange }: ChatInputProps) {
+  const [localText, setLocalText] = useState('');
+  const text = value ?? localText;
+  const setText = onChange ?? setLocalText;
 
   function submit() {
     if (!text.trim()) return;
@@ -16,7 +24,7 @@ export default function ChatInput({ onSend }: { onSend: (text: string) => void }
   return (
     <Box className="flex items-center gap-2">
       <OutlinedInput
-        placeholder="Escribe '1', '2', '3' o responde al asistente..."
+        placeholder="Escribe lo que necesites realizar"
         fullWidth
         value={text}
         onChange={(e) => setText(e.target.value)}

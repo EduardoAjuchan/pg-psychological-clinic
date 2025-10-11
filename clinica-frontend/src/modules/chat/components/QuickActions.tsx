@@ -9,17 +9,17 @@ export default function QuickActions({ onPick }: { onPick: (text: string) => voi
     {
       icon: <PsychologyAltOutlinedIcon sx={{ color: '#e11d48' }} />, // rosa
       label: 'Posible Diagnóstico',
-      payload: 'Genera un posible diagnóstico según los síntomas descritos.',
+      payload: 'Genera un posible diagnóstico para el paciente...',
     },
     {
       icon: <DescriptionOutlinedIcon sx={{ color: '#059669' }} />, // verde
       label: 'Técnicas Recomendadas',
-      payload: 'Sugiere técnicas de intervención apropiadas para el caso.',
+      payload: 'Sugiere técnicas de intervención apropiadas para el caso del paciente...',
     },
     {
       icon: <FavoriteBorderIcon sx={{ color: '#7c3aed' }} />, // morado
       label: 'Crear Nota de Sesión',
-      payload: 'Crea una nota de sesión con los puntos tratados.',
+      payload: 'Crea una nota de sesión para el paciente... con los siguientes datos...',
     },
   ];
 
